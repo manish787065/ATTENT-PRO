@@ -9,6 +9,8 @@ import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/gradient_button.dart';
 import '../../../features/auth/auth_provider.dart';
 import '../../../core/constants/app_constants.dart';
+import 'student_reports_screen.dart';
+import 'student_profile_screen.dart';
 
 class StudentDashboard extends ConsumerStatefulWidget {
   const StudentDashboard({super.key});
@@ -72,30 +74,97 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard>
           child: Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
-                      _buildTopBar(name),
-                      const SizedBox(height: 24),
-                      _buildAttendanceRing(),
-                      const SizedBox(height: 24),
-                      _buildEnrollmentBanner(),
-                      const SizedBox(height: 24),
-                      Text('Subject Attendance',
-                          style: AppTextStyles.titleLarge),
-                      const SizedBox(height: 14),
-                      ..._subjects.map(_buildSubjectCard),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
+                child: _buildCurrentPage(name),
               ),
               _buildBottomNav(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Page Switcher based on bottom nav ───
+  Widget _buildCurrentPage(String name) {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildHomePage(name);
+      case 1:
+        return _buildQRPage();
+      case 2:
+        return const StudentReportsScreen();
+      case 3:
+        return const StudentProfileScreen();
+      default:
+        return _buildHomePage(name);
+    }
+  }
+
+  // ─── Home Page (original dashboard content) ───
+  Widget _buildHomePage(String name) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          _buildTopBar(name),
+          const SizedBox(height: 24),
+          _buildAttendanceRing(),
+          const SizedBox(height: 24),
+          _buildEnrollmentBanner(),
+          const SizedBox(height: 24),
+          Text('Subject Attendance', style: AppTextStyles.titleLarge),
+          const SizedBox(height: 14),
+          ..._subjects.map(_buildSubjectCard),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // ─── QR Scanner placeholder page ───
+  Widget _buildQRPage() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.qr_code_scanner_rounded,
+                  color: AppColors.primary, size: 64),
+            ),
+            const SizedBox(height: 24),
+            Text('QR Scanner', style: AppTextStyles.headlineMedium),
+            const SizedBox(height: 8),
+            Text(
+              'Scan the QR code shown by your teacher to mark attendance',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium,
+            ),
+            const SizedBox(height: 32),
+            GradientButton(
+              label: 'Open Scanner',
+              onPressed: () {
+                // TODO: Implement QR scanner
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('QR Scanner coming soon!'),
+                    backgroundColor: AppColors.surface,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -113,9 +182,9 @@ class _StudentDashboardState extends ConsumerState<StudentDashboard>
           ],
         ),
         GestureDetector(
-          onTap: () async {
-            await ref.read(authNotifierProvider.notifier).signOut();
-            if (mounted) context.go('/');
+          onTap: () {
+            // Navigate to profile tab
+            setState(() => _selectedIndex = 3);
           },
           child: Container(
             width: 48,
