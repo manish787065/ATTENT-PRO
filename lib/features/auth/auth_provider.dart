@@ -1,9 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../shared/models/user_model.dart';
+import '../../shared/services/auth_service.dart';
 import '../../core/constants/app_constants.dart';
 
-// ─── Demo Mode Auth (No Firebase needed) ─────────────────────────────────────
-// Replace with real Firebase auth after google-services.json is set up
+// ─── Auth State ─────────────────────────────────────────────────────────────
 
 class AuthState {
   final UserModel? user;
@@ -20,91 +21,141 @@ class AuthState {
   }
 }
 
-// Demo users for testing all 3 roles without Firebase
-final Map<String, UserModel> _demoUsers = {
-  'student@demo.com': UserModel(
-    uid: 'demo-student-001',
-    name: 'Rahul Kumar',
-    email: 'student@demo.com',
-    role: AppConstants.roleStudent,
-    institutionId: 'DEMO_COLLEGE',
-    parentEmail: 'parent@demo.com',
-    createdAt: DateTime.now(),
-  ),
-  'teacher@demo.com': UserModel(
-    uid: 'demo-teacher-001',
-    name: 'Prof. Sharma',
-    email: 'teacher@demo.com',
-    role: AppConstants.roleTeacher,
-    institutionId: 'DEMO_COLLEGE',
-    createdAt: DateTime.now(),
-  ),
-  'admin@demo.com': UserModel(
-    uid: 'demo-admin-001',
-    name: 'Admin Singh',
-    email: 'admin@demo.com',
-    role: AppConstants.roleAdmin,
-    institutionId: 'DEMO_COLLEGE',
-    createdAt: DateTime.now(),
-  ),
-};
+// ─── Auth Service Provider ──────────────────────────────────────────────────
 
-final Map<String, String> _demoPasswords = {
-  'student@demo.com': 'demo123',
-  'teacher@demo.com': 'demo123',
-  'admin@demo.com': 'demo123',
-};
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());
+
+// ─── Auth Notifier (Real Firebase Auth) ─────────────────────────────────────
 
 class AuthNotifier extends Notifier<AuthState> {
+  late final AuthService _authService;
+
   @override
-  AuthState build() => const AuthState();
+  AuthState build() {
+    _authService = ref.read(authServiceProvider);
+    // Check if user is already logged in
+    _checkCurrentUser();
+    return const AuthState();
+  }
+
+  Future<void> _checkCurrentUser() async {
+    final firebaseUser = _authService.currentUser;
+    if (firebaseUser != null) {
+      try {
+        final userModel = await _authService.getUserModel(firebaseUser.uid);
+        if (userModel != null) {
+          state = state.copyWith(user: userModel);
+        }
+      } catch (e) {
+        // Silently fail — user will need to log in again
+      }
+    }
+  }
 
   Future<void> signIn(String email, String password) async {
     state = state.copyWith(isLoading: true, error: null);
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 800));
 
-    final emailKey = email.trim().toLowerCase();
-    final user = _demoUsers[emailKey];
-    final correctPassword = _demoPasswords[emailKey];
+    try {
+      final credential = await _authService.signInWithEmail(email, password);
+      final uid = credential.user!.uid;
 
-    if (user != null && password == correctPassword) {
-      state = state.copyWith(user: user, isLoading: false);
-    } else {
+      // Fetch user profile from Firestore
+      final userModel = await _authService.getUserModel(uid);
+
+      if (userModel != null) {
+        state = state.copyWith(user: userModel, isLoading: false);
+      } else {
+        // User exists in Firebase Auth but not in Firestore
+        // Create a basic user model from Firebase Auth data
+        final firebaseUser = credential.user!;
+        final fallbackUser = UserModel(
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName ?? 'User',
+          email: firebaseUser.email ?? email,
+          role: AppConstants.roleStudent, // Default role
+          institutionId: 'default',
+          createdAt: DateTime.now(),
+        );
+        state = state.copyWith(user: fallbackUser, isLoading: false);
+      }
+    } on FirebaseAuthException catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Invalid credentials. Demo default: student@demo.com / demo123',
+        error: e.code, // Pass the error code for the UI to translate
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
       );
     }
   }
 
-  Future<void> register(UserModel newUser, String password) async {
+  Future<void> registerStudent({
+    required String name,
+    required String email,
+    required String password,
+    required String institutionId,
+    String? parentEmail,
+    String? parentPhone,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future.delayed(const Duration(milliseconds: 800));
-    
-    final emailKey = newUser.email.toLowerCase();
-    if (_demoUsers.containsKey(emailKey)) {
-      state = state.copyWith(isLoading: false);
-      throw Exception('Email already registered!');
-    }
 
-    _demoUsers[emailKey] = newUser;
-    _demoPasswords[emailKey] = password;
-    state = state.copyWith(isLoading: false);
+    try {
+      final userModel = await _authService.registerStudent(
+        name: name,
+        email: email,
+        password: password,
+        institutionId: institutionId,
+        parentEmail: parentEmail,
+        parentPhone: parentPhone,
+      );
+      state = state.copyWith(user: userModel, isLoading: false);
+    } on FirebaseAuthException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.code);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> registerTeacher({
+    required String name,
+    required String email,
+    required String password,
+    required String institutionId,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final userModel = await _authService.registerTeacher(
+        name: name,
+        email: email,
+        password: password,
+        institutionId: institutionId,
+      );
+      state = state.copyWith(user: userModel, isLoading: false);
+    } on FirebaseAuthException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.code);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
   }
 
   Future<void> signOut() async {
-    await Future.delayed(const Duration(milliseconds: 300));
+    await _authService.signOut();
     state = const AuthState();
   }
 }
 
+// ─── Providers ──────────────────────────────────────────────────────────────
+
 final authNotifierProvider =
     NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
 
-// Stream provider kept for router compatibility — always null (not logged in) on start
-final authStateProvider = StreamProvider<String?>((ref) async* {
-  yield null; // Start not logged in
+// Auth state stream from Firebase
+final authStateProvider = StreamProvider<User?>((ref) {
+  final authService = ref.read(authServiceProvider);
+  return authService.authStateChanges;
 });
 
 // Current user from auth notifier

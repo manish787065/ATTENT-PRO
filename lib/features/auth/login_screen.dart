@@ -324,13 +324,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   String _getErrorMessage(Object error) {
-    if (error is Exception) {
-      final msg = error.toString();
-      if (msg.contains('user-not-found')) return 'No account found with this email';
-      if (msg.contains('wrong-password')) return 'Incorrect password';
-      if (msg.contains('invalid-email')) return 'Invalid email format';
-      if (msg.contains('too-many-requests')) return 'Too many attempts. Try later';
-    }
-    return 'Login failed. Please try again.';
+    final msg = error.toString();
+    if (msg.contains('user-not-found')) return 'No account found with this email';
+    if (msg.contains('wrong-password')) return 'Incorrect password';
+    if (msg.contains('invalid-credential')) return 'Invalid email or password';
+    if (msg.contains('invalid-email')) return 'Invalid email format';
+    if (msg.contains('too-many-requests')) return 'Too many attempts. Try later';
+    if (msg.contains('network-request-failed')) return 'No internet connection';
+    if (msg.contains('user-disabled')) return 'This account has been disabled';
+    return 'Login failed. Please check your credentials.';
   }
 }

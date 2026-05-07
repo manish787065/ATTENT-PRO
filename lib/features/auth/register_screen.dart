@@ -51,24 +51,55 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _errorMsg = null;
     });
     try {
-      final newUser = UserModel(
-        uid: 'demo-${DateTime.now().millisecondsSinceEpoch}',
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        role: isStudent ? AppConstants.roleStudent : AppConstants.roleTeacher,
-        institutionId: _institutionController.text.trim(),
-        parentEmail: _parentEmailController.text.trim().isEmpty ? null : _parentEmailController.text.trim(),
-        createdAt: DateTime.now(),
-      );
+      final notifier = ref.read(authNotifierProvider.notifier);
       
-      await ref.read(authNotifierProvider.notifier).register(
-        newUser,
-        _passwordController.text,
-      );
+      if (isStudent) {
+        await notifier.registerStudent(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          institutionId: _institutionController.text.trim(),
+          parentEmail: _parentEmailController.text.trim().isEmpty
+              ? null
+              : _parentEmailController.text.trim(),
+          parentPhone: _parentPhoneController.text.trim().isEmpty
+              ? null
+              : _parentPhoneController.text.trim(),
+        );
+      } else {
+        await notifier.registerTeacher(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          institutionId: _institutionController.text.trim(),
+        );
+      }
 
-      if (mounted) context.go('/');
+      // After successful registration, navigate to dashboard
+      if (mounted) {
+        final user = ref.read(authNotifierProvider).user;
+        if (user != null) {
+          switch (user.role) {
+            case AppConstants.roleAdmin:
+              context.go('/admin/dashboard');
+            case AppConstants.roleTeacher:
+              context.go('/teacher/dashboard');
+            default:
+              context.go('/student/dashboard');
+          }
+        }
+      }
     } catch (e) {
-      setState(() => _errorMsg = e.toString().replaceAll('Exception: ', ''));
+      final msg = e.toString();
+      if (msg.contains('email-already-in-use')) {
+        setState(() => _errorMsg = 'This email is already registered');
+      } else if (msg.contains('weak-password')) {
+        setState(() => _errorMsg = 'Password is too weak');
+      } else if (msg.contains('invalid-email')) {
+        setState(() => _errorMsg = 'Invalid email format');
+      } else {
+        setState(() => _errorMsg = 'Registration failed. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
