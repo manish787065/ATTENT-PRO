@@ -98,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen>
                       borderRadius: BorderRadius.circular(28),
                     ),
                     child: const Icon(
-                      Icons.remove_red_eye_rounded,
+                      Icons.fact_check_rounded,
                       color: Colors.white,
                       size: 52,
                     ),

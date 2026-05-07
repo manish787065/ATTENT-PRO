@@ -199,7 +199,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.remove_red_eye_rounded,
+              child: const Icon(Icons.fact_check_rounded,
                   color: Colors.white, size: 28),
             ),
             const SizedBox(width: 14),
